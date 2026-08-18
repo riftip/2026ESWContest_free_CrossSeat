@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>좌석 감지 · 관리자</title>
+<style>
+/* =========================================================================
+   예전 /vision 화면의 색을 그대로 유지했습니다 (어두운 남색 계열).
+   달라진 점은 관리자 영역과 알림 팝업이 추가된 것뿐입니다.
+   ========================================================================= */
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  background: #0f172a; color: #e2e8f0; padding: 26px; margin: 0;
+}
+h1 { font-size: 21px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 26px 0 9px; }
+.sub { color: #64748b; font-size: 13px; margin-bottom: 16px; }
+.wrap { max-width: 940px; }
+
+.warn {
+  background: #f59e0b; color: #1a1a1a; padding: 8px 14px; border-radius: 7px;
+  display: inline-block; font-size: 12.5px; font-weight: 600; margin-bottom: 16px;
+}
+
+/* ------------------------------------------------------------ 관리자 영역 */
+.adminbar {
+  background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 18px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.adminbar .label { font-size: 13px; color: #94a3b8; margin-right: 4px; }
+.adminbar input {
+  background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+  padding: 9px 12px; border-radius: 7px; font-size: 14px; width: 150px;
+  font-family: inherit;
+}
+.adminbar input:focus { outline: none; border-color: #38bdf8; }
+.adminbar button {
+  padding: 9px 16px; border: none; border-radius: 7px; cursor: pointer;
+  font-size: 13.5px; font-weight: 600; font-family: inherit;
+}
+.btn-go   { background: #38bdf8; color: #0f172a; }
+.btn-go:hover { background: #7dd3fc; }
+.btn-out  { background: #334155; color: #e2e8f0; }
+.btn-out:hover { background: #475569; }
+.adminbar.on { border-color: #38bdf8; }
+.on-badge {
+  background: #38bdf8; color: #0f172a; font-size: 12px; font-weight: 700;
+  padding: 4px 10px; border-radius: 5px;
+}
+.adminbar .note { font-size: 12.5px; color: #94a3b8; }
+.adminbar .err { font-size: 12.5px; color: #fca5a5; }
+
+/* ------------------------------------------------------------ 좌석 카드 */
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.card {
+  background: #1e293b; border: 2px solid #334155; border-radius: 11px;
+  padding: 15px; transition: 0.12s;
+}
+.card.clickable { cursor: pointer; }
+.card.clickable:hover { transform: translateY(-2px); background: #253449; }
+.row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.seatno { font-size: 15.5px; font-weight: 700; }
+.badge { padding: 3px 10px; border-radius: 5px; font-size: 12px; font-weight: 700; color: #fff; }
+.meta { font-size: 12.5px; color: #cbd5e1; margin-top: 5px; }
+.hw {
+  font-size: 11.5px; color: #64748b; margin-top: 9px;
+  border-top: 1px solid #334155; padding-top: 8px;
+}
+.act { font-size: 11.5px; color: #38bdf8; margin-top: 8px; font-weight: 600; }
+code { background: #0f172a; padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+
+/* ------------------------------------------------------------ 목록 */
+ul { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+li { background: #1e293b; padding: 9px 13px; border-radius: 7px; margin-bottom: 4px; }
+.t { color: #64748b; margin-right: 9px; font-variant-numeric: tabular-nums; }
+.empty { color: #64748b; }
+
+/* ------------------------------------------------------------ 알림 팝업 */
+.notices {
+  position: fixed; top: 18px; right: 18px; width: 330px; z-index: 100;
+  display: flex; flex-direction: column; gap: 9px;
+}
+.notice {
+  background: #1e293b; border-left: 5px solid #ef4444;
+  border-radius: 9px; padding: 13px 14px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+  animation: slidein 0.22s ease-out;
+}
+@keyframes slidein {
+  from { opacity: 0; transform: translateX(22px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notice { animation: none; }
+  .card.clickable:hover { transform: none; }
+}
+.notice .head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px;
+}
+.notice .tag { font-size: 12px; font-weight: 700; }
+.notice .close {
+  background: none; border: none; color: #94a3b8; font-size: 18px;
+  cursor: pointer; line-height: 1; padding: 0 2px; font-family: inherit;
+}
+.notice .close:hover { color: #e2e8f0; }
+.notice .body { font-size: 13px; line-height: 1.5; color: #e2e8f0; }
+.notice .time { font-size: 11px; color: #64748b; margin-top: 6px; }
+
+.tips { margin-top: 26px; font-size: 12px; color: #64748b; line-height: 1.7; }
+.tips code { color: #94a3b8; }
+
+@media (max-width: 720px) {
+  body { padding: 16px; }
+  .grid { grid-template-columns: 1fr; }
+  .notices { left: 12px; right: 12px; width: auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="notices" id="notices"></div>
+
+<div class="wrap">
+  <h1>좌석 감지 · 관리자</h1>
+  <div class="sub" id="sub">불러오는 중…</div>
+
+  <div id="hwBanner"></div>
+
+  <!-- ================================================== 관리자 로그인/모드 -->
+  <div class="adminbar" id="adminbar">
+    <span class="label">관리자</span>
+    <input type="password" id="pinInput" placeholder="비밀번호" autocomplete="off">
+    <button class="btn-go" id="loginBtn">확인</button>
+    <span class="err" id="loginErr"></span>
+    <span class="note">비밀번호를 입력하면 좌석을 눌러 강제 반납할 수 있습니다.</span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <h2>조치 필요</h2>
+  <ul id="alerts"></ul>
+
+  <h2>상태 변화 이력
+    <span style="color:#64748b;font-weight:400;font-size:12px">(엣지 트리거가 발동한 시점)</span>
+  </h2>
+  <ul id="events"></ul>
+
+  <div class="tips">
+    빠른 시연: <code>/api/vision/config?warn=10&amp;term=20</code> 을 주소창에 열면
+    경고·종료 시간을 10초·20초로 줄일 수 있습니다.<br>
+    발권은 <code>/</code> 페이지에서 하면 이 화면에 바로 반영됩니다.
+  </div>
+</div>
+
+<script>
+/* ===========================================================================
+   이 화면이 하는 일
+
+     1) 1.5초마다 /api/vision 을 읽어 좌석 카드를 다시 그린다
+        (예전처럼 meta refresh 로 페이지를 통째로 새로고침하지 않는다.
+         새로고침하면 관리자 로그인 상태와 입력 중인 값이 매번 날아가기 때문)
+
+     2) 비밀번호를 넣으면 관리자 모드가 켜지고, 좌석 카드가 눌러진다
+        -> 누르면 강제 반납
+
+     3) 서버가 C / D / E 상태 변화를 알려주면 오른쪽 위에 팝업을 띄운다
+        -> 닫기(×) 를 누르면 사라지고 다시 뜨지 않는다
+   =========================================================================== */
+
+let adminPin  = null;          // 로그인하면 여기 저장 (강제반납 요청에 같이 보냄)
+const shown   = new Set();     // 이미 화면에 띄운 알림 번호
+let firstLoad = true;
+
+const grid      = document.getElementById('grid');
+const noticesEl = document.getElementById('notices');
+const adminbar  = document.getElementById('adminbar');
+const pinInput  = document.getElementById('pinInput');
+const loginErr  = document.getElementById('loginErr');
+
+
+/* ------------------------------------------------------------- 관리자 로그인 */
+async function login() {
+  const pin = pinInput.value.trim();
+  loginErr.textContent = '';
+
+  if (!pin) { loginErr.textContent = '비밀번호를 입력하세요.'; return; }
+
+  try {
+    const res  = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: pin })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      adminPin = pin;
+      renderAdminBar();
+      tick();
+    } else {
+      loginErr.textContent = data.message || '비밀번호가 틀렸습니다.';
+      pinInput.value = '';
+      pinInput.focus();
+    }
+  } catch (e) {
+    loginErr.textContent = '서버에 연결할 수 없습니다: ' + e.message;
+  }
+}
+
+function logout() {
+  adminPin = null;
+  renderAdminBar();
+  tick();
+}
+
+function renderAdminBar() {
+  if (adminPin) {
+    adminbar.className = 'adminbar on';
+    adminbar.innerHTML =
+      '<span class="on-badge">관리자 모드</span>' +
+      '<span class="note">좌석 카드를 누르면 강제 반납됩니다.</span>' +
+      '<button class="btn-out" id="outBtn">모드 끄기</button>';
+    document.getElementById('outBtn').onclick = logout;
+  } else {
+    adminbar.className = 'adminbar';
+    adminbar.innerHTML =
+      '<span class="label">관리자</span>' +
+      '<input type="password" id="pinInput" placeholder="비밀번호" autocomplete="off">' +
+      '<button class="btn-go" id="loginBtn">확인</button>' +
+      '<span class="err" id="loginErr"></span>' +
+      '<span class="note">비밀번호를 입력하면 좌석을 눌러 강제 반납할 수 있습니다.</span>';
+    bindLogin();
+  }
+}
+
+function bindLogin() {
+  const inp = document.getElementById('pinInput');
+  const btn = document.getElementById('loginBtn');
+  if (!inp || !btn) return;
+  btn.onclick = login;
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+}
+
+
+/* --------------------------------------------------------------- 강제 반납 */
+async function forceReturn(seat) {
+  if (!adminPin) return;
+  if (!seat.ticketed) { alert(seat.seat_id + '번 좌석은 발권되어 있지 않습니다.'); return; }
+  if (!confirm(seat.seat_id + '번 좌석을 강제 반납할까요?\n전원이 차단됩니다.')) return;
+
+  try {
+    const res  = await fetch('/api/admin/force_return/' + seat.seat_id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: adminPin })
+    });
+    const data = await res.json();
+    if (!data.success) alert(data.message || '강제 반납에 실패했습니다.');
+    tick();
+  } catch (e) {
+    alert('요청을 보내지 못했습니다: ' + e.message);
+  }
+}
+
+
+/* ----------------------------------------------------------------- 좌석 카드 */
+function timeText(seat, th) {
+  if (seat.person) return '사람 있음';
+
+  const vac = seat.vacant_seconds;
+  if (seat.ticketed) {
+    const toWarn = th.warn - vac;
+    const toTerm = th.terminate - vac;
+    if (toWarn > 0) return Math.round(vac) + '초 비움 · 경고까지 ' + Math.round(toWarn) + '초';
+    if (toTerm > 0) return Math.round(vac) + '초 비움 · 종료까지 ' + Math.round(toTerm) + '초';
+    return Math.round(vac) + '초 비움 · 종료됨';
+  }
+  return Math.round(vac) + '초 비움';
+}
+
+function maskPhone(p) {
+  if (!p) return '-';
+  if (adminPin) return p;                 // 관리자만 전체 번호를 본다
+  return p.replace(/-\d{4}-/, '-****-');
+}
+
+function renderSeats(seats, th) {
+  grid.innerHTML = '';
+
+  seats.forEach(seat => {
+    const div = document.createElement('div');
+    div.className = 'card' + (adminPin && seat.ticketed ? ' clickable' : '');
+    div.style.borderColor = seat.color;
+
+    div.innerHTML =
+      '<div class="row">' +
+        '<span class="seatno">좌석 ' + seat.seat_id + '</span>' +
+        '<span class="badge" style="background:' + seat.color + '">' +
+          (seat.state || '-') + ' · ' + (seat.state_name || '판정 전') +
+        '</span>' +
+      '</div>' +
+      '<div class="meta">발권 <b>' + (seat.ticketed ? 'O' : 'X') + '</b> · ' +
+        maskPhone(seat.phone) + '</div>' +
+      '<div class="meta">' + timeText(seat, th) + '</div>' +
+      '<div class="hw">LED <code>' + (seat.led || '-') + '</code> · 전원 <code>' +
+        (seat.power ? 'ON' : 'OFF') + '</code></div>' +
+      (adminPin && seat.ticketed ? '<div class="act">눌러서 강제 반납</div>' : '');
+
+    if (adminPin && seat.ticketed) div.onclick = () => forceReturn(seat);
+    grid.appendChild(div);
+  });
+}
+
+
+/* ------------------------------------------------------------------ 알림 팝업 */
+function addNotice(n) {
+  const box = document.createElement('div');
+  box.className = 'notice';
+  box.style.borderLeftColor = n.color;
+
+  box.innerHTML =
+    '<div class="head">' +
+      '<span class="tag" style="color:' + n.color + '">' +
+        n.state + ' · ' + n.state_name +
+      '</span>' +
+      '<button class="close" aria-label="알림 닫기">&times;</button>' +
+    '</div>' +
+    '<div class="body">' + n.message + '</div>' +
+    '<div class="time">' + n.at + '</div>';
+
+  box.querySelector('.close').onclick = () => box.remove();
+  noticesEl.prepend(box);
+}
+
+function handleNotices(list) {
+  // 서버는 최신순으로 준다. 화면에는 오래된 것부터 넣어야 순서가 맞는다.
+  const ordered = list.slice().reverse();
+
+  if (firstLoad) {
+    // 페이지를 새로 열었을 때 과거 알림이 한꺼번에 쏟아지지 않도록,
+    // 최근 3개만 보여주고 나머지는 "이미 본 것"으로 처리한다.
+    const recent = list.slice(0, 3).map(n => n.id);
+    ordered.forEach(n => {
+      shown.add(n.id);
+      if (recent.includes(n.id)) addNotice(n);
+    });
+    firstLoad = false;
+    return;
+  }
+
+  ordered.forEach(n => {
+    if (!shown.has(n.id)) { shown.add(n.id); addNotice(n); }
+  });
+}
+
+
+/* --------------------------------------------------------------- 목록 그리기 */
+function renderLists(data) {
+  const alerts = document.getElementById('alerts');
+  const events = document.getElementById('events');
+
+  alerts.innerHTML = data.alerts.length
+    ? data.alerts.map(a =>
+        '<li><span class="t">' + a.at + '</span>' + a.message + '</li>').join('')
+    : '<li class="empty">조치할 알림 없음</li>';
+
+  events.innerHTML = data.events.length
+    ? data.events.map(e =>
+        '<li><span class="t">' + e.at + '</span>좌석' + e.seat_id +
+        ' ' + e.from + ' → ' + e.to + '</li>').join('')
+    : '<li class="empty">아직 상태 변화 없음</li>';
+}
+
+
+/* ------------------------------------------------------------------ 주기 갱신 */
+async function tick() {
+  try {
+    const res = await fetch('/api/vision');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    document.getElementById('sub').textContent =
+      data.now + ' · 1.5초마다 자동 갱신 · 임계값 경고 ' +
+      data.thresholds.warn + '초 / 종료 ' + data.thresholds.terminate + '초';
+
+    document.getElementById('hwBanner').innerHTML = data.hardware_enabled ? '' :
+      '<div class="warn">하드웨어 미연결 — LED·전원은 터미널에 로그만 출력됩니다 ' +
+      '(app.py 상단의 HARDWARE_ENABLED 를 True 로)</div>';
+
+    renderSeats(data.seats, data.thresholds);
+    renderLists(data);
+    handleNotices(data.notices || []);
+
+  } catch (e) {
+    document.getElementById('sub').textContent = '서버와 통신할 수 없습니다: ' + e.message;
+  }
+}
+
+bindLogin();
+tick();
+setInterval(tick, 1500);
+</script>
+</body>
+</html>
