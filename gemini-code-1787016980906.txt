@@ -3,6 +3,12 @@
 // ====================================================================
 // FRAME : Width = 2000 mm, Height = 1550 mm, Depth = 900 mm (+/-450 mm)
 // PROFILE: 28 x 28 mm | BED: 250 x 250 mm
+//
+// [OUTPUT PLATES (총 13 Plates)]
+// Plate 1 ~ 10 : 긴 부재 (각 6개씩 = 60개)
+// Plate 11     : 긴 부재 잔여 (2개)
+// Plate 12     : 바닥 발 받침대 6개 (수직 2, 전방대각 2, 후방대각 2)
+// Plate 13     : 상단 허브 2개 + RPi 4/카메라 마운트 1개
 // ====================================================================
 
 $fn = 40;
@@ -11,7 +17,7 @@ $fn = 40;
 // 0. 실행 모드 설정
 // --------------------------------------------------------------------
 mode = "assembly"; // ["assembly", "plate"]
-plate_no = 12;     // [1:12]
+plate_no = 13;     // [1:13]
 
 // --------------------------------------------------------------------
 // 1. 기본 규격 치수
@@ -39,13 +45,13 @@ DIAG_PARTS     = DIAG_N * 4;           // 36개
 LONG_TOTAL     = VERTICAL_PARTS + BEAM_PARTS + DIAG_PARTS; // 총 62개
 
 PARTS_PER_PLATE = 6;
-LONG_PLATES     = ceil(LONG_TOTAL / PARTS_PER_PLATE); // 11 플레이트 (롱부재 1~11)
+LONG_PLATES     = ceil(LONG_TOTAL / PARTS_PER_PLATE); // 11 플레이트
 
 BEAM_START = VERTICAL_PARTS;
 DIAG_START = BEAM_START + BEAM_PARTS;
 
 // ====================================================================
-// 2. 수학 및 정렬 유틸리티 (무결점 벡터 정렬)
+// 2. 수학 및 정렬 유틸리티
 // ====================================================================
 
 module orient_to(v) {
@@ -70,7 +76,7 @@ module socket_cut(dir, depth=35) {
 }
 
 // ====================================================================
-// 3. 출력용 결합형 프로파일 부재
+// 3. 출력용 프로파일 부재
 // ====================================================================
 
 module print_member(L, kind) {
@@ -78,21 +84,20 @@ module print_member(L, kind) {
     PIN_SIZE = INNER - (2 * CLEAR);
 
     difference() {
-        // 메인 바디
         cube([PROFILE, PROFILE, L]);
 
-        // 암 소켓 (시작단)
+        // 암 소켓
         if (kind != "first") {
             translate([(PROFILE - INNER)/2, (PROFILE - INNER)/2, -0.1])
                 cube([INNER, INNER, PIN_LEN + 0.1]);
         }
 
-        // 경량화/재료 절감용 내부 중공 (중간 영역)
+        // 경량화/절감 중공
         translate([WALL, WALL, PIN_LEN])
             cube([INNER, INNER, max(0.1, L - (2 * PIN_LEN))]);
     }
 
-    // 수 핀 (종단)
+    // 수 핀
     if (kind != "last") {
         translate([(PROFILE - PIN_SIZE)/2, (PROFILE - PIN_SIZE)/2, L])
             cube([PIN_SIZE, PIN_SIZE, PIN_LEN]);
@@ -119,7 +124,7 @@ module get_long_part(index) {
 }
 
 // ====================================================================
-// 4. 상단 4-Way 조인트 허브
+// 4. 상단 4-Way 조인트 허브 (소켓 방향 일치화)
 // ====================================================================
 
 module top_hub() {
@@ -131,17 +136,19 @@ module top_hub() {
         translate([HUB/2, 0, 0]) rotate([0, -90, 0]) socket_cut([0, 0, 1], 35);
         translate([-HUB/2, 0, 0]) rotate([0, 90, 0]) socket_cut([0, 0, 1], 35);
 
-        // 수직 기둥 소켓 (-Z)
+        // 수직 기둥 소켓 (허브 아래 방향)
         translate([0, 0, -HUB/2]) socket_cut([0, 0, 1], 35);
 
-        // 앞/뒤 대각선 소켓 (FRAME_H=1550, FRAME_D=450 반영)
-        translate([0, 0, -HUB/2]) socket_cut([0, FRAME_D, FRAME_H], 35);
+        // 전방 대각 빔 소켓: 허브(0, 0, H)에서 바닥(0, FRAME_D, 0) 방향
         translate([0, 0, -HUB/2]) socket_cut([0, -FRAME_D, FRAME_H], 35);
+
+        // 후방 대각 빔 소켓: 허브(0, 0, H)에서 바닥(0, -FRAME_D, 0) 방향
+        translate([0, 0, -HUB/2]) socket_cut([0, FRAME_D, FRAME_H], 35);
     }
 }
 
 // ====================================================================
-// 5. 바닥 발 받침대 (Foot Mount)
+// 5. 바닥 발 받침대 (소켓 방향 일치화)
 // ====================================================================
 
 module bottom_joint(kind) {
@@ -150,7 +157,6 @@ module bottom_joint(kind) {
     BASE_H = 45;
 
     difference() {
-        // 지지대 본체 + 바닥 체결용 플랜지
         union() {
             translate([-BASE_W/2, -BASE_L/2, 0])
                 cube([BASE_W, BASE_L, BASE_H]);
@@ -158,22 +164,24 @@ module bottom_joint(kind) {
                 cube([BASE_W + 20, BASE_L + 20, 8]);
         }
 
-        // 바닥 고정 스크루 홀 (4개소)
+        // 바닥 고정 스크루 홀
         for (sx = [-1, 1], sy = [-1, 1]) {
             translate([sx * (BASE_W/2 + 5), sy * (BASE_L/2 + 5), -1])
                 cylinder(d=5.5, h=12);
         }
 
-        // 프로파일 삽입 소켓
+        // 프로파일 삽입 소켓 (바닥 상단면에서 내부로 절삭)
         if (kind == "vertical") {
             translate([0, 0, BASE_H])
                 socket_cut([0, 0, -1], 35);
         } else if (kind == "front") {
-            translate([0, 0, BASE_H])
-                socket_cut([0, -FRAME_D, -FRAME_H], 35);
-        } else if (kind == "back") {
+            // 전방 바닥(0, FRAME_D, 0)에서 상단 허브(0, 0, H)로 올라가는 방향의 반대
             translate([0, 0, BASE_H])
                 socket_cut([0, FRAME_D, -FRAME_H], 35);
+        } else if (kind == "back") {
+            // 후방 바닥(0, -FRAME_D, 0)에서 상단 허브(0, 0, H)로 올라가는 방향의 반대
+            translate([0, 0, BASE_H])
+                socket_cut([0, -FRAME_D, -FRAME_H], 35);
         }
     }
 }
@@ -222,7 +230,7 @@ module rpi_camera_mount() {
 }
 
 // ====================================================================
-// 7. 슬라이싱 출력 플레이트 모듈
+// 7. 슬라이싱 출력 플레이트 모듈 (Plate 1~13)
 // ====================================================================
 
 module print_plate() {
@@ -268,7 +276,7 @@ module beam_line(p1, p2) {
 }
 
 module assembly() {
-    // 상단 빔
+    // 상단 가로 빔
     color("silver")
         beam_line([0, 0, FRAME_H], [FRAME_W, 0, FRAME_H]);
 
@@ -284,7 +292,7 @@ module assembly() {
         translate([x, -FRAME_D, 0]) bottom_joint("back");
     }
 
-    // 카메라 마운트
+    // 라즈베리파이 + 카메라 마운트
     translate([FRAME_W/2 - 62.5, -PROFILE/2 - 6, FRAME_H - PROFILE/2 - 6])
         color("lime") rpi_camera_mount();
 
