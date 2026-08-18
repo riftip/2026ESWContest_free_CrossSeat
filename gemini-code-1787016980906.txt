@@ -1,7 +1,7 @@
 // ====================================================================
-// [CAMERA FRAME - 2.0m(W) x 1.5m(H) x 0.9m(D) SOLID MODULAR SYSTEM]
+// [CAMERA FRAME - 2.0m(W) x 1.55m(H) x 0.9m(D) SOLID MODULAR SYSTEM]
 // ====================================================================
-// FRAME : Width = 2000 mm, Height = 1500 mm, Depth = 900 mm (+/-450 mm)
+// FRAME : Width = 2000 mm, Height = 1550 mm, Depth = 900 mm (+/-450 mm)
 // PROFILE: 28 x 28 mm | BED: 250 x 250 mm
 // ====================================================================
 
@@ -17,7 +17,7 @@ plate_no = 12;     // [1:12]
 // 1. 기본 규격 치수
 // --------------------------------------------------------------------
 FRAME_W = 2000;   // 가로 너비 (2.0m)
-FRAME_H = 1500;   // 수직 높이 (1.5m)
+FRAME_H = 1550;   // 수직 높이 (1.55m)
 FRAME_D = 450;    // 앞뒤 폭 900mm 기준 중심 오프셋 (+/-450mm)
 
 PROFILE = 28;     // 프로파일 외경 (28x28mm)
@@ -26,20 +26,20 @@ BODY    = 200;    // 단일 부재 기본 길이
 PIN_LEN = 30;     // 결합 핀 길이
 CLEAR   = 0.25;   // 결합 공차
 
-DIAG = sqrt(FRAME_H * FRAME_H + FRAME_D * FRAME_D); // 대각 빔 길이 (~1566.0mm)
+DIAG = sqrt(FRAME_H * FRAME_H + FRAME_D * FRAME_D); // 대각 빔 길이 (~1614.0mm)
 
 // 부재 수량 산출
-VERTICAL_N     = ceil(FRAME_H / BODY); // 8개
-BEAM_N         = ceil(FRAME_W / BODY); // 10개
-DIAG_N         = ceil(DIAG / BODY);    // 8개
+VERTICAL_N     = ceil(FRAME_H / BODY); // 8개 (200x7 + 150)
+BEAM_N         = ceil(FRAME_W / BODY); // 10개 (200x10)
+DIAG_N         = ceil(DIAG / BODY);    // 9개 (200x8 + 14.0)
 
 VERTICAL_PARTS = VERTICAL_N * 2;       // 16개
 BEAM_PARTS     = BEAM_N;               // 10개
-DIAG_PARTS     = DIAG_N * 4;           // 32개
-LONG_TOTAL     = VERTICAL_PARTS + BEAM_PARTS + DIAG_PARTS; // 총 58개
+DIAG_PARTS     = DIAG_N * 4;           // 36개
+LONG_TOTAL     = VERTICAL_PARTS + BEAM_PARTS + DIAG_PARTS; // 총 62개
 
 PARTS_PER_PLATE = 6;
-LONG_PLATES     = ceil(LONG_TOTAL / PARTS_PER_PLATE); // 10 플레이트
+LONG_PLATES     = ceil(LONG_TOTAL / PARTS_PER_PLATE); // 11 플레이트 (롱부재 1~11)
 
 BEAM_START = VERTICAL_PARTS;
 DIAG_START = BEAM_START + BEAM_PARTS;
@@ -134,7 +134,7 @@ module top_hub() {
         // 수직 기둥 소켓 (-Z)
         translate([0, 0, -HUB/2]) socket_cut([0, 0, 1], 35);
 
-        // 앞/뒤 대각선 소켓 (FRAME_D=450에 맞춘 각도)
+        // 앞/뒤 대각선 소켓 (FRAME_H=1550, FRAME_D=450 반영)
         translate([0, 0, -HUB/2]) socket_cut([0, FRAME_D, FRAME_H], 35);
         translate([0, 0, -HUB/2]) socket_cut([0, -FRAME_D, FRAME_H], 35);
     }
@@ -150,7 +150,7 @@ module bottom_joint(kind) {
     BASE_H = 45;
 
     difference() {
-        // 지지대 본체 + 볼트 고정용 플랜지 베이스
+        // 지지대 본체 + 바닥 체결용 플랜지
         union() {
             translate([-BASE_W/2, -BASE_L/2, 0])
                 cube([BASE_W, BASE_L, BASE_H]);
@@ -189,18 +189,15 @@ module rpi_camera_mount() {
 
     difference() {
         union() {
-            // 상단 가로 빔 슬라이드 클램프
             cube([PW, PROFILE + (CLAMP_THICK * 2), PROFILE + (CLAMP_THICK * 2)]);
-            // 전자부품 장착 플레이트
             translate([0, PROFILE + CLAMP_THICK * 2, 0])
                 cube([PW, 5, PH]);
         }
 
-        // 프로파일 관통 공간
         translate([-1, CLAMP_THICK, CLAMP_THICK])
             cube([PW + 2, PROFILE + CLEAR*2, PROFILE + CLEAR*2]);
 
-        // RPi 4 고정 홀 (58 x 49mm 규격, M2.5)
+        // RPi 4 고정 홀 (58 x 49mm, M2.5)
         rpi_x = 15;
         rpi_z = 25;
         for (ox = [0, 58], oz = [0, 49]) {
@@ -209,12 +206,12 @@ module rpi_camera_mount() {
                     cylinder(d=2.8, h=15);
         }
 
-        // 카메라 모듈 렌즈 및 체결 홀 (21 x 12.5mm 간격, M2)
+        // 카메라 렌즈 및 체결 홀
         cam_cx = 102;
         cam_cz = 50;
         translate([cam_cx, PROFILE + CLAMP_THICK * 2 + 10, cam_cz])
             rotate([90, 0, 0])
-                cylinder(d=13, h=15); // 렌즈 구멍
+                cylinder(d=13, h=15);
 
         for (dx = [-10.5, 10.5], dz = [-6.25, 6.25]) {
             translate([cam_cx + dx, PROFILE + CLAMP_THICK * 2 + 10, cam_cz + dz])
@@ -229,7 +226,6 @@ module rpi_camera_mount() {
 // ====================================================================
 
 module print_plate() {
-    // 250 x 250 mm 빌드 베드 표시
     %color("gray", 0.15)
         translate([-125, -125, -2])
             cube([250, 250, 2]);
@@ -243,15 +239,15 @@ module print_plate() {
                     get_long_part(idx);
             }
         }
-    } else if (plate_no == 11) {
-        // 바닥 발 받침대 6개 (수직 2, 앞 대각 2, 뒤 대각 2)
+    } else if (plate_no == 12) {
+        // 바닥 발 받침대 6개
         translate([-55, -65, 0]) bottom_joint("vertical");
         translate([55, -65, 0])  bottom_joint("vertical");
         translate([-55, 0, 0])   bottom_joint("front");
         translate([55, 0, 0])    bottom_joint("front");
         translate([-55, 65, 0])  bottom_joint("back");
         translate([55, 65, 0])   bottom_joint("back");
-    } else if (plate_no == 12) {
+    } else if (plate_no == 13) {
         // 상단 허브 2개 + 카메라 마운트 1개
         translate([-55, 55, 95/2])  top_hub();
         translate([55, 55, 95/2])   top_hub();
@@ -276,24 +272,23 @@ module assembly() {
     color("silver")
         beam_line([0, 0, FRAME_H], [FRAME_W, 0, FRAME_H]);
 
-    // 좌/우 A-Frame 기둥 및 대각 빔
+    // 좌/우 A-Frame 기둥 및 대각선 빔
     for (x = [0, FRAME_W]) {
         color("silver") beam_line([x, 0, 0], [x, 0, FRAME_H]);
         color("orange") beam_line([x, FRAME_D, 0], [x, 0, FRAME_H]);
         color("orange") beam_line([x, -FRAME_D, 0], [x, 0, FRAME_H]);
 
-        // 조인트 배치
         translate([x, 0, FRAME_H]) top_hub();
         translate([x, 0, 0]) bottom_joint("vertical");
         translate([x, FRAME_D, 0]) bottom_joint("front");
         translate([x, -FRAME_D, 0]) bottom_joint("back");
     }
 
-    // 라즈베리파이 마운트
+    // 카메라 마운트
     translate([FRAME_W/2 - 62.5, -PROFILE/2 - 6, FRAME_H - PROFILE/2 - 6])
         color("lime") rpi_camera_mount();
 
-    // 바닥 기준면 (2000 x 900 mm 반영)
+    // 바닥 기준면
     %color("gray", 0.25)
         translate([-100, -FRAME_D - 50, -8])
             cube([FRAME_W + 200, (FRAME_D + 50) * 2, 8]);
