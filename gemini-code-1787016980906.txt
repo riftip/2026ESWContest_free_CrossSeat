@@ -1,7 +1,7 @@
 // ====================================================================
-// [CAMERA FRAME - 2.0m x 1.5m SOLID MODULAR SYSTEM]
+// [CAMERA FRAME - 2.0m(W) x 1.5m(H) x 0.9m(D) SOLID MODULAR SYSTEM]
 // ====================================================================
-// FRAME : Width = 2000 mm, Height = 1500 mm, Depth = +/-350 mm
+// FRAME : Width = 2000 mm, Height = 1500 mm, Depth = 900 mm (+/-450 mm)
 // PROFILE: 28 x 28 mm | BED: 250 x 250 mm
 // ====================================================================
 
@@ -18,7 +18,7 @@ plate_no = 12;     // [1:12]
 // --------------------------------------------------------------------
 FRAME_W = 2000;   // 가로 너비 (2.0m)
 FRAME_H = 1500;   // 수직 높이 (1.5m)
-FRAME_D = 350;    // 전후 지지폭 (+/-350mm)
+FRAME_D = 450;    // 앞뒤 폭 900mm 기준 중심 오프셋 (+/-450mm)
 
 PROFILE = 28;     // 프로파일 외경 (28x28mm)
 WALL    = 4.5;    // 벽 두께
@@ -26,7 +26,7 @@ BODY    = 200;    // 단일 부재 기본 길이
 PIN_LEN = 30;     // 결합 핀 길이
 CLEAR   = 0.25;   // 결합 공차
 
-DIAG = sqrt(FRAME_H * FRAME_H + FRAME_D * FRAME_D); // 대각 빔 길이 (~1540.3mm)
+DIAG = sqrt(FRAME_H * FRAME_H + FRAME_D * FRAME_D); // 대각 빔 길이 (~1566.0mm)
 
 // 부재 수량 산출
 VERTICAL_N     = ceil(FRAME_H / BODY); // 8개
@@ -134,7 +134,7 @@ module top_hub() {
         // 수직 기둥 소켓 (-Z)
         translate([0, 0, -HUB/2]) socket_cut([0, 0, 1], 35);
 
-        // 앞/뒤 대각선 소켓
+        // 앞/뒤 대각선 소켓 (FRAME_D=450에 맞춘 각도)
         translate([0, 0, -HUB/2]) socket_cut([0, FRAME_D, FRAME_H], 35);
         translate([0, 0, -HUB/2]) socket_cut([0, -FRAME_D, FRAME_H], 35);
     }
@@ -293,10 +293,10 @@ module assembly() {
     translate([FRAME_W/2 - 62.5, -PROFILE/2 - 6, FRAME_H - PROFILE/2 - 6])
         color("lime") rpi_camera_mount();
 
-    // 바닥 기준면
+    // 바닥 기준면 (2000 x 900 mm 반영)
     %color("gray", 0.25)
-        translate([-100, -FRAME_D - 100, -8])
-            cube([FRAME_W + 200, (FRAME_D + 100) * 2, 8]);
+        translate([-100, -FRAME_D - 50, -8])
+            cube([FRAME_W + 200, (FRAME_D + 50) * 2, 8]);
 }
 
 // ====================================================================
