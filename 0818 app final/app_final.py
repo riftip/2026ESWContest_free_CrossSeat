@@ -109,7 +109,7 @@ TAPO_PASS = os.environ.get("TAPO_PASS", "young040125")
 #  하드웨어 제어 스위치
 #    False = 실제 명령을 안 보내고 터미널에 로그만 출력 (하드웨어 없이 테스트)
 #    True  = Wemos LED / Tapo 콘센트에 실제로 명령 전송
-HARDWARE_ENABLED = False
+HARDWARE_ENABLED = True
 
 LED_ENABLED = True      # LED 만 따로 끄고 싶을 때
 POWER_ENABLED = True    # 콘센트만 따로 끄고 싶을 때
